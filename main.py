@@ -9,6 +9,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.ppo import policies, MlpPolicy
 from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.vec_env import VecTransposeImage
 
 from imitation.algorithms import bc
 from imitation.policies.serialize import load_policy
@@ -29,7 +30,7 @@ def train_expert():
     # note: use `download_expert` instead to download a pretrained, competent expert
     print("Training an expert.")
     expert = PPO(
-        policy=MlpPolicy,
+        policy="CnnPolicy",
         env=env,
         seed=0,
         batch_size=64,
@@ -39,7 +40,7 @@ def train_expert():
         n_epochs=20,
         n_steps=128
     )
-    expert.learn(100_000)  # Note: change this to 100_000 to train a decent expert.
+    expert.learn(100_00000)  # Note: change this to 100_000 to train a decent expert.
     expert.save(f"./expert_data/{arglist.env_name}")
     return expert
 
@@ -63,17 +64,18 @@ def sample_expert_transitions(expert: policies):
 if __name__ == '__main__':
 
     # make environment
-    mp.set_start_method('spawn', force=True)
+    #mp.set_start_method('spawn', force=True)
     arglist = arguments.parse_args()
 
     rng = np.random.default_rng(0)
 
-    env = make_vec_env(
+    env = VecTransposeImage(make_vec_env(
         arglist.env_name,
         n_envs=arglist.n_env,
         rng=rng,
-        parallel=True,
-        max_episode_steps=500,
+        #parallel=True,
+        #max_episode_steps=500,
+    )
     )
 
     print(arglist.env_name)
@@ -82,15 +84,18 @@ if __name__ == '__main__':
 
     # load expert data
 
-    expert = PPO.load(f"./expert_data/{arglist.env_name}")
-    transitions = torch.load(f"./expert_data/transitions_{arglist.env_name}.npy")
+    #expert = PPO.load(f"./expert_data/{arglist.env_name}")
+    #transitions = torch.load(f"./expert_data/transitions_{arglist.env_name}.npy")
 
     # TODO: If the environment is running for the first time (i.e., no expert data is present in the folder), please execute the following code first.
-    # expert = train_expert()  # uncomment to train your own expert
-    # transitions = sample_expert_transitions(expert)
+    expert = train_expert()  # uncomment to train your own expert
+   
 
     mean_reward, std_reward = evaluate_policy(model=expert, env=env)
     print("Average reward of the expert is evaluated at: " + str(mean_reward) + ',' + str(std_reward) + '.')
+    
+
+    transitions = sample_expert_transitions(expert)
     print("Number of transitions in demonstrations: " + str(transitions.obs.shape[0]) + ".")
 
     # @truncate the length of expert transition

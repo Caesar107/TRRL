@@ -272,8 +272,7 @@ class TRRL(algo_base.DemonstrationAlgorithm[types.Transitions]):
         #print("n_episodes:",n_episodes,"self.n_env:",self.arglist.n_env,"sample_num:",sample_num)
         # Starting estimating Q(s,a)
         # Store trajectories staring at (s,a). We skip MC sampling for previously encounered (s,a) and will use the trajectories stored in the buffer.
-        key_q = ((starting_s,) if isinstance(starting_s, (int, np.integer)) else tuple(starting_s),
-                 (starting_a,) if isinstance(starting_a, (int, np.integer)) else tuple(starting_a))
+        key_q = (tuple(starting_s.flatten()), tuple(starting_a.flatten()))
         # Cache rewards of trajectories staring at (s,a) for calculating Q(s,a)
         cached_rewards_q = []
 
@@ -320,7 +319,7 @@ class TRRL(algo_base.DemonstrationAlgorithm[types.Transitions]):
         q = torch.mean(torch.stack(cached_rewards_q))
 
         # Starting estimating V(s)
-        key_v = (starting_s,) if isinstance(starting_s, (int, np.integer)) else tuple(starting_s)
+        key_v = (tuple(starting_s.flatten()))
         cached_rewards_v = []
         # Monte Carlo
         if use_mc:
@@ -383,7 +382,7 @@ class TRRL(algo_base.DemonstrationAlgorithm[types.Transitions]):
         _ = venv_with_cur_rwd_net.reset()
 
         new_policy = PPO(
-            policy=MlpPolicy,
+            policy="CnnPolicy",
             env=venv_with_cur_rwd_net,
             learning_rate=0.0005,
             n_epochs=5,
