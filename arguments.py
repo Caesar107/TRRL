@@ -14,12 +14,12 @@ def parse_args():
     parser.add_argument("--device", type=str, default='cpu', help="torch device")
 
     # environment
-    # parser.add_argument("--env_name", type=str, default="CartPole-v1", help="the environment")
+    # Ant-v4, HalfCheetah-v4, Hopper-v3, Walker2d-v3, Pendulum-v1, Acrobot-v1, BipedalWalker-v3, FrozenLake-v1, CartPole-v1，MountainCar-v0
     parser.add_argument("--env_name", type=str, default="FrozenLake-v1", help="the environment")
-    parser.add_argument("--n_env", type=int, default=1, help="number of parallel envs in venvs")
+    parser.add_argument("--n_env", type=int, default=8, help="number of parallel envs in venvs")
     parser.add_argument("--discount", type=float, default=0.99, help="discount factor")
     parser.add_argument("--ent_coef", type=float, default=0.01, help="entropy coefficient")
-    parser.add_argument("--demo_batch_size", type=int, default=512, help="number of demos to generate")
+    parser.add_argument("--demo_batch_size", type=int, default=64, help="number of demos to generate")
 
     # core training parameters
     parser.add_argument("--max_epoch", type=int, default=100, help="maximum epoch length")
@@ -32,15 +32,22 @@ def parse_args():
     parser.add_argument("--l2_norm_upper_bound", type=float, default=0.1,
                         help="upper bound for the l2 norm of the difference between the old and new reward function")
 
+    # adaptive coef adjustment paremeters
+    parser.add_argument("--target_reward_diff", type=float, default=0.005,
+                        help="threshold for dynamic adjustment of Lagrange multiplier for average reward difference.")
+    parser.add_argument("--target_reward_l2_norm", type=float, default=0.1,
+                        help="threshold for dynamic adjustment of Lagrange multiplier for l2 norm of reward difference.")
+
+
     # experiment control parameters
-    parser.add_argument("--n_runs", type=int, default=10, help="number of global rounds")
-    parser.add_argument("--n_policy_updates_per_round", type=int, default=300,
+    parser.add_argument("--n_global_rounds", type=int, default=1000, help="number of global rounds")
+    parser.add_argument("--n_policy_updates_per_round", type=int, default=10000,
                         help="number of policy udpates per global round")
-    parser.add_argument("--n_reward_updates_per_round", type=int, default=3,
+    parser.add_argument("--n_reward_updates_per_round", type=int, default=10,
                         help="number of reward udpates per global round")
-    parser.add_argument("--n_episodes_adv_fn_est", type=int, default=64,
+    parser.add_argument("--n_episodes_adv_fn_est", type=int, default=16,
                         help="number of episodes for advantage function estimation")
-    parser.add_argument("--n_timesteps_adv_fn_est", type=int, default=32,
+    parser.add_argument("--n_timesteps_adv_fn_est", type=int, default=64,
                         help="number of timesteps for advantage function estimation")
 
     # checkpointing
@@ -57,4 +64,9 @@ def parse_args():
     parser.add_argument("--save_results_dir", type=str, default="./output/",
                         help="directory which results are output to")
 
+    parser.add_argument("--transition_truncate_len", type=int, default=1024,
+                        help="truncate transitions")
+
+    parser.add_argument("--mc_interval", type=int, default=10,
+                        help="Monte Carlo sample interval")
     return parser.parse_args()

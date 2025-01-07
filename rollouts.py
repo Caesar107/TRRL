@@ -16,6 +16,9 @@ from typing import (
     Tuple,
     Union,
 )
+import arguments
+arglist = arguments.parse_args()
+import time
 
 import numpy as np
 from gymnasium import spaces
@@ -23,7 +26,6 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.utils import check_for_correct_spaces
 from stable_baselines3.common.vec_env import VecEnv
-
 from imitation.data import types
 
 
@@ -417,18 +419,25 @@ def generate_trajectories(
     trajectories = []
     # accumulator for incomplete trajectories
     trajectories_accum = TrajectoryAccumulator()
+    obs = venv.reset()
 
-    init_obs = venv.reset()
     if starting_state is not None:
-        for e in venv.unwrapped.envs:
-            e.unwrapped.state = starting_state
-        init_obs = np.repeat([starting_state], repeats=[venv.num_envs], axis=0)
+        # Fix Pendulum bug:ValueError: too many values to unpack (expected 2)
+        # if arglist.env_name not in ("Acrobot-v1","Pendulum-v1") :
+        #     for e in venv.unwrapped.envs:
+        #         e.unwrapped.state = starting_state
+
+        obs = np.repeat([starting_state], repeats=[venv.num_envs], axis=0)
+
+    init_acts = None
+    if starting_action is not None:
+        init_acts = np.repeat([starting_action], repeats=[venv.num_envs], axis=0)
 
     assert isinstance(
-        init_obs,
+        obs,
         (np.ndarray, dict),
     ), "Tuple observations are not supported."
-    wrapped_obs = types.maybe_wrap_in_dictobs(init_obs)
+    wrapped_obs = types.maybe_wrap_in_dictobs(obs)
     # we use dictobs to iterate over the envs in a vecenv
     for env_idx, ob in enumerate(wrapped_obs):
         # Seed with first obs only. Inside loop, we'll only add second obs from
@@ -446,21 +455,23 @@ def generate_trajectories(
     #
     # To start with, all environments are active.
     active = np.ones(venv.num_envs, dtype=bool)
-
     state = None
     dones = np.zeros(venv.num_envs, dtype=bool)
+
+    flag = True
     while np.any(active):
         # policy gets unwrapped observations (eg as dict, not dictobs)
 
-        init_acts = None
-
-        if starting_action is not None:
-            init_acts = np.repeat(starting_action, repeats=[venv.num_envs], axis=0)
+        # acts, state = get_actions(obs, state, dones)
+        # obs, rews, dones, infos = venv.step(acts)
+        #
+        if flag == True and init_acts is not None:
+            acts = init_acts
+            flag = False
         else:
-            init_acts, state = get_actions(init_obs, state, dones)
+            acts, state = get_actions(obs, state, dones)
 
-        obs, rews, dones, infos = venv.step(init_acts)
-        init_obs = obs
+        obs, rews, dones, infos = venv.step(acts)
 
         assert isinstance(
             obs,
@@ -475,7 +486,7 @@ def generate_trajectories(
         dones &= active
 
         new_trajs = trajectories_accum.add_steps_and_auto_finish(
-            init_acts,
+            acts,
             wrapped_obs,
             rews,
             dones,
@@ -687,6 +698,66 @@ def generate_transitions(
         transitions = types.TransitionsWithRew(**truncated)
 
     return transitions
+
+
+def generate_transitions_new(
+        policy: AnyPolicy,
+        venv: VecEnv,
+        n_timesteps: int,
+        rng: np.random.Generator,
+        *,
+        starting_state: None,
+        starting_action: None,
+        truncate: bool = True,
+        **kwargs: Any,
+) -> list:
+    """Generate obs-action-next_obs-reward tuples.
+
+    Args:
+        policy: Can be any of the following:
+            - A stable_baselines3 policy or algorithm trained on the gym environment
+            - A Callable that takes an ndarray of observations and returns an ndarray
+            of corresponding actions
+            - None, in which case actions will be sampled randomly
+        venv: The vectorized environments to interact with.
+        n_timesteps: The minimum number of timesteps to sample.
+        rng: The random state to use for sampling trajectories.
+        truncate: If True, then drop any additional samples to ensure that exactly
+            `n_timesteps` samples are returned.
+        starting_state: starting state of a generated trajectory if specified.
+        starting_action: starting action of a generated trajectory if specified.
+        **kwargs: Passed-through to generate_trajectories.
+
+    Returns:
+        A batch of Transitions. The length of the constituent arrays is guaranteed
+        to be at least `n_timesteps` (if specified), but may be greater unless
+        `truncate` is provided as we collect data until the end of each episode.
+    """
+    traj = generate_trajectories(
+        policy,
+        venv,
+        sample_until=make_min_timesteps(n_timesteps),
+        rng=rng,
+        starting_state=starting_state,
+        starting_action=starting_action,
+        **kwargs,
+    )
+    # print("traj",traj)
+    # print("traj",len(traj))
+
+    result_traj = []
+    for t in traj:
+        # print("phi_t",t)
+        transitions = flatten_trajectories_with_rew([t])
+
+        if truncate and n_timesteps is not None:
+            as_dict = types.dataclass_quick_asdict(transitions)
+            truncated = {k: arr[:n_timesteps] for k, arr in as_dict.items()}
+            transitions = types.TransitionsWithRew(**truncated)
+        result_traj.append(transitions)
+
+    # print("result_traj",result_traj)
+    return result_traj
 
 
 def rollout(
