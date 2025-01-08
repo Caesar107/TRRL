@@ -90,7 +90,7 @@ if __name__ == '__main__':
     # load expert data
 
     expert = PPO.load(f"./expert_data/{arglist.env_name}")
-    transitions = torch.load(f"./expert_data/transitions_{arglist.env_name}.npy")
+    #transitions = torch.load(f"./expert_data/transitions_{arglist.env_name}.npy")
 
     # TODO: If the environment is running for the first time (i.e., no expert data is present in the folder), please execute the following code first.
     #expert = train_expert()  # uncomment to train your own expert
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     print("Average reward of the expert is evaluated at: " + str(mean_reward) + ',' + str(std_reward) + '.')
     
 
-    #ransitions = sample_expert_transitions(expert)
+    transitions = sample_expert_transitions(expert)
     print("Number of transitions in demonstrations: " + str(transitions.obs.shape[0]) + ".")
 
     # @truncate the length of expert transition
