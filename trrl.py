@@ -382,7 +382,7 @@ class TRRL(algo_base.DemonstrationAlgorithm[types.Transitions]):
         _ = venv_with_cur_rwd_net.reset()
 
         new_policy = PPO(
-            policy="CnnPolicy",
+            policy="MlpPolicy",
             env=venv_with_cur_rwd_net,
             learning_rate=0.0005,
             n_epochs=5,
